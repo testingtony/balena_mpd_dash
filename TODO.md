@@ -7,8 +7,8 @@ Making it useful for dockerization
 - [x] Have it exit cleanly if the environment variables aren't set
 
 Putting it in docker
-- [ ] Create a multi-module project
-- [ ] Add in mpd and dash_mpd as subprojects
+- [x] Create a multi-module project
+- [x] Add in mpd and dash_mpd as subprojects
 
 Making it better
 - [ ] Pick a playlist based on day/time

@@ -2,6 +2,7 @@ package amazon
 
 import (
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -104,13 +105,20 @@ func newTLSConfig() (*tls.Config, error) {
 	if !ok {
 		return nil, ErrNoDetails
 	}
+	certData, err := base64.StdEncoding.DecodeString(certPem)
+	if err != nil {
+		return nil, err
+	}
 	keyPem, ok := os.LookupEnv("KEY_PEM")
 	if !ok {
 		return nil, ErrNoDetails
 	}
-
+	keyData, err := base64.StdEncoding.DecodeString(keyPem)
+	if err != nil {
+		return nil, err
+	}
 	// Import client certificate/key pair
-	cert, err := tls.X509KeyPair([]byte(certPem), []byte(keyPem))
+	cert, err := tls.X509KeyPair(certData, keyData)
 	if err != nil {
 		return nil, err
 	}
