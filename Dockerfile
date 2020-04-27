@@ -1,9 +1,10 @@
 FROM golang:1.14.2-alpine as build
 
+RUN apk update && apk add gcc libc-dev
 WORKDIR /root
 ADD . .
 RUN go test ./...
-RUN CGO_ENABLED=0 GOARCH=arm GOOS=linux go install -ldflags '-extldflags "-static"'
+RUN CGO_ENABLED=0 GOARCH=arm GOOS=linux go build -ldflags '-extldflags "-static"'
 
 FROM alpine:latest as alpine
 RUN apk --no-cache add tzdata zip ca-certificates
@@ -20,6 +21,6 @@ COPY --from=alpine /zoneinfo.zip /
 # the tls certificates:
 COPY --from=alpine /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
-COPY --from=build /go/bin/dash_mpd .
+COPY --from=build /root/dash_mpd .
 
 ENTRYPOINT ["./dash_mpd"]
