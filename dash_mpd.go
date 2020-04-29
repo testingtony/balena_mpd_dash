@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math/rand"
+	"net"
 	"os"
 	"time"
 
@@ -31,7 +32,17 @@ func main() {
 		}
 		panic(err)
 	}
-	mpd := mpd.NewConnection()
+	mpd, err := mpd.NewConnection()
+	if err != nil {
+		if dns, ok := err.(*net.DNSError); ok {
+			if dns.IsNotFound {
+				fmt.Println(err, "sleeping for a bit")
+				time.Sleep(1 * time.Minute)
+				os.Exit(1)
+			}
+		}
+		panic(err)
+	}
 
 	mode := none
 	for {

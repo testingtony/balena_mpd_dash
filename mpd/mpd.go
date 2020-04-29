@@ -3,9 +3,12 @@ package mpd
 import (
 	"fmt"
 	"math/rand"
+	"net"
 	"os"
 	"regexp"
+	"time"
 
+	"github.com/tatsushid/go-fastping"
 	"github.com/vincent-petithory/mpdclient"
 )
 
@@ -21,20 +24,30 @@ type Mpd struct {
 /*
 NewConnection gets a new MPD connection
 */
-func NewConnection() *Mpd {
+func NewConnection() (*Mpd, error) {
 	host, ok := os.LookupEnv("MPDHOST")
 	if !ok {
-		host = "lounge"
+		host = "localhost"
 	}
+
+	hadToWait, err := waitForMPD(host)
+	if err != nil {
+		return nil, err
+	}
+	// wait for MPD to fully start if it wasn't there at the start
+	if hadToWait {
+		time.Sleep(10 * time.Second)
+	}
+
 	conn, err := mpdclient.Connect(host, 6600)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	return &Mpd{
 		playlistMode: false,
 		albumMode:    false,
 		mpd:          *conn,
-	}
+	}, nil
 }
 
 /*
@@ -119,4 +132,44 @@ func (m *Mpd) AddPlaylist(playlist string) error {
 	fmt.Println("Adding playlist", playlist)
 	response := m.mpd.Cmd(fmt.Sprintf(`load "%s"`, playlist))
 	return response.Err
+}
+
+func waitForMPD(hostname string) (bool, error) {
+	p := fastping.NewPinger()
+	p.MaxRTT = 5 * time.Second
+	ra, err := net.ResolveIPAddr("ip4:icmp", hostname)
+	if err != nil {
+		return false, err
+	}
+
+	ping := make(chan bool)
+
+	p.AddIPAddr(ra)
+	p.OnRecv = func(addr *net.IPAddr, rtt time.Duration) {
+		ping <- true
+	}
+	p.OnIdle = func() {
+		ping <- false
+	}
+	p.RunLoop()
+
+	hadToWait := false
+	ticker := time.NewTicker(5 * time.Second)
+	for alive := false; !alive; {
+		select {
+		case x := <-p.Done():
+			fmt.Println(x)
+			if err := p.Err(); err != nil {
+				return false, err
+			}
+		case alive = <-ping:
+			if !alive {
+				hadToWait = true
+			}
+		case <-ticker.C:
+			fmt.Println("No response from", hostname, "waiting")
+		}
+	}
+	p.Stop()
+	return hadToWait, nil
 }
