@@ -11,10 +11,8 @@ import (
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 )
 
-/*
-PressType a constent of how the IOT button was pressed.
-*/
-type PressType int
+// MessageType - what is being requested by pressing a button
+type MessageType int
 
 /*
 ErrNoDetails is returned from the connection if all the environment variables aren't defined
@@ -23,26 +21,32 @@ var ErrNoDetails error = errors.New("Need CLIENT_ID, MQTT_HOST, CERT_PEM & KEY_P
 
 const (
 	// Unknown we don't know what was pressed
-	Unknown PressType = iota
-	// Single a single press
-	Single
-	// Double a double press
-	Double
-	// Long a long press
-	Long
+	Unknown MessageType = iota
+	// Playlist - I want a store playlist playing
+	Playlist
+	// Stop - I want to stop playing
+	Stop
+	// Album - Play a random album
+	Album
 )
 
-var stringToPressType map[string]PressType = map[string]PressType{
-	"SINGLE": Single,
-	"DOUBLE": Double,
-	"LONG":   Long,
+var stringToMessageType map[string]MessageType = map[string]MessageType{
+	"SINGLE": Playlist,
+	"DOUBLE": Stop,
+	"LONG":   Album,
+}
+
+type buttonMessage struct {
+	SerialNumber   string
+	BatteryVoltage string
+	ClickType      string
 }
 
 /*
 ConnectAndSubscribe will connect to the Amazon MQTT and returns a channel
 where all received messages will be published
 */
-func ConnectAndSubscribe() (chan PressType, error) {
+func ConnectAndSubscribe() (chan MessageType, error) {
 
 	clientID, ok := os.LookupEnv("CLIENT_ID")
 	if !ok {
@@ -69,16 +73,15 @@ func ConnectAndSubscribe() (chan PressType, error) {
 		return nil, token.Error()
 	}
 
-	ch := make(chan PressType)
+	ch := make(chan MessageType)
 
 	var f MQTT.MessageHandler = func(client MQTT.Client, msg MQTT.Message) {
-		// fmt.Printf("MSG: %s\n", msg.Payload())
+		fmt.Printf("MSG: %s ", msg.Payload())
 		var buttonData buttonMessage
 		if err := json.Unmarshal(msg.Payload(), &buttonData); err != nil {
 			panic(err)
 		}
-
-		buttonPress, ok := stringToPressType[buttonData.ClickType]
+		buttonPress, ok := stringToMessageType[buttonData.ClickType]
 		if ok {
 			ch <- buttonPress
 		} else {
@@ -91,12 +94,6 @@ func ConnectAndSubscribe() (chan PressType, error) {
 
 	return ch, nil
 
-}
-
-type buttonMessage struct {
-	SerialNumber   string
-	BatteryVoltage string
-	ClickType      string
 }
 
 func newTLSConfig() (*tls.Config, error) {

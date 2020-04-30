@@ -48,15 +48,15 @@ func main() {
 	for {
 		press := <-ch
 		switch press {
-		case amazon.Single:
+		case amazon.Playlist:
 			mpd.StopAndClear()
 			mpd.AddPlaylist(getPlaylist(mode))
 			mode = playlist
 			mpd.Play()
-		case amazon.Double:
+		case amazon.Stop:
 			mpd.StopAndClear()
 			mode = none
-		case amazon.Long:
+		case amazon.Album:
 			mpd.StopAndClear()
 			mode = album
 			mpd.AddRandomAlbum()
@@ -65,18 +65,57 @@ func main() {
 	}
 }
 
-var wantedPlaylist = [...]string{"Radio 6 Music", "Radio 2", "Radio 4 Extra", "Radio 4"}
-var index int = 0
+const (
+	radio6      string = "Radio 6 Music"
+	radio2             = "Radio 2"
+	radio4extra        = "Radio 4 Extra"
+	radio4             = "Radio 4"
+	radioX             = "Radio X"
+)
+
+var wantedPlaylist = [...]string{radio6, radio2, radio4extra, radio4}
+var playing = ""
 
 func getPlaylist(mode modeType) string {
+	return getPlaylistForTime(mode, time.Now())
+}
+
+func getPlaylistForTime(mode modeType, when time.Time) string {
+
 	if mode == playlist {
+		index := -1
+		for i, title := range wantedPlaylist {
+			if title == playing {
+				index = i
+			}
+		}
 		index++
 		if index >= len(wantedPlaylist) {
 			index = 0
 		}
+		playing = wantedPlaylist[index]
 	} else {
-		index = 0
+		playing = getFirstPlaylistForTime(when)
 	}
 
-	return wantedPlaylist[index]
+	return playing
+}
+
+func getFirstPlaylistForTime(t time.Time) string {
+	hour := t.Hour()
+	switch t.Weekday() {
+	case time.Sunday:
+		if hour >= 10 {
+			return radio2
+		}
+	case time.Saturday:
+		if hour >= 11 && hour < 14 {
+			return radio2
+		}
+	default:
+		if hour >= 6 && hour < 10 {
+			return radioX
+		}
+	}
+	return radio6
 }
