@@ -67,13 +67,25 @@ func ConnectAndSubscribe() (chan MessageType, error) {
 	opts.AddBroker(host)
 	opts.SetClientID(clientID).SetTLSConfig(tlsconfig)
 
+	ch := make(chan MessageType)
+
+	var onConnect MQTT.OnConnectHandler = func(c MQTT.Client) {
+		doSubscribe(c, ch)
+	}
+
+	opts.SetOnConnectHandler(onConnect)
+
 	// Start the connection
 	c := MQTT.NewClient(opts)
 	if token := c.Connect(); token.Wait() && token.Error() != nil {
 		return nil, token.Error()
 	}
 
-	ch := make(chan MessageType)
+	return ch, nil
+
+}
+
+func doSubscribe(c MQTT.Client, ch chan MessageType) {
 
 	var f MQTT.MessageHandler = func(client MQTT.Client, msg MQTT.Message) {
 		fmt.Printf("MSG: %s ", msg.Payload())
@@ -91,9 +103,6 @@ func ConnectAndSubscribe() (chan MessageType, error) {
 	}
 	c.Subscribe("#", 0, f)
 	fmt.Println("Subscribed")
-
-	return ch, nil
-
 }
 
 func newTLSConfig() (*tls.Config, error) {
